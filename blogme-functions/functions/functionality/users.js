@@ -7,13 +7,13 @@ const BusBoy = require('busboy');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const { user } = require('firebase-functions/lib/providers/auth');
 
 firebase.initializeApp(firebaseConfig);
 
 exports.signUp = (request, response) => {
     const newUser = {
-        name: request.body.name,
-        surname: request.body.surname,
+        nick: request.body.nick,
         email: request.body.email,
         password: request.body.password,
         confirmPassword: request.body.confirmPassword,
@@ -65,8 +65,7 @@ exports.signUp = (request, response) => {
             token = tok;
             const userCredentials = {
                 handle: newUser.handle,
-                name: newUser.name,
-                surname: newUser.surname,
+                nick: newUser.nick,
                 email: newUser.email,
                 createdAt: new Date().toISOString(),
                 imageUrl: `https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${defaultImage}?alt=media`,
@@ -158,7 +157,7 @@ exports.uploadAvatar = (request, response) => {
             return admin.firestore().doc(`/users/${request.user.handle}`).update({ imageUrl });
         })
         .then(() => {
-            return response.json({ message: 'Avatar wgrany pomyslnie.' })
+            return response.json({ message: 'Awatar wgrany pomyslnie.' })
         })
         .catch((err) => {
             console.error(err);
@@ -167,4 +166,38 @@ exports.uploadAvatar = (request, response) => {
     });
 
     busboy.end(request.rawBody);
+};
+
+exports.addUserDetails = (request, response) => {
+    const profile = {
+        bio: request.body.bio,
+        website: request.body.website,
+        location: request.body.location
+    };
+
+    // --- WALIDACJA ---
+    let userDetails = {};
+
+    // informacje w bio
+    if (!isEmpty(request.body.bio.trim())) userDetails.bio = profile.bio;
+
+    // strona internetowa
+    if (!isEmpty(profile.website.trim())) {
+        if (profile.website.trim().substring(0, 4) !== 'http') {
+            userDetails.website = `http://${profile.website.trim()}`;
+        } else userDetails.website = profile.website;
+    }
+
+    // lokalizacja
+    if (!isEmpty(profile.location.trim())) userDetails.location = profile.location;
+
+    admin.firestore().doc(`/users/${request.user.handle}`)
+    .update(userDetails)
+    .then(() => {
+        return response.json({ message: "Details added successfully" });
+    })
+    .catch((err) => {
+        console.error(err);
+        return response.status(500).json({ error: err.code });
+    });
 };
